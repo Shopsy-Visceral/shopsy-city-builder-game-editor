@@ -24,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# release zips + build-info.json from scripts/package-release.sh
+release

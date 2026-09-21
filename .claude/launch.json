@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "city-builder-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8087
+    },
+    {
+      "name": "release-boot-test",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["builds/serve.js", "dist", "8092", "--mock"],
+      "port": 8092
+    }
+  ]
+}
