@@ -10,6 +10,7 @@ import { LEVELS, LEVEL_BUILDING_OFFSET_Y } from "../data/levels";
 import { GAME_PANEL } from "../game-core/GamePanel";
 import { GAME_STATE } from "../game-core/GameState";
 import { ShopsyAnalytics } from "../shopsystan/shopsyAnalytics";
+import UserProfileManager from "../shopsystan/UserProfileManager";
 import { initShopsyBridge, shopsyBridge } from "../shopsystan/shopsyBridge";
 import { GAME_NAME } from "../utils/config";
 import { PlayerPrefs } from "../utils/PlayerPrefs";
@@ -305,6 +306,8 @@ export default class LevelSelect extends Phaser.Scene {
 
     create(): void {
         this.editorCreate();
+        // why: Preload's profile gate guarantees the server profile before this scene, so a one-shot read is enough (no UPDATE_PROFILE listener, same as Level.ts)
+        this.profile_text.setText(UserProfileManager.getProfileData()?.basic.userName ?? "Player");
         this.mapWorldContainer.setDepth(0);
         this.mapUiContainer.setDepth(1000);
         this.popupDark.setDepth(2000);

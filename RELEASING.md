@@ -16,8 +16,8 @@ equivalents are listed below.
 | `gameId` the build sends | `city-builder` (`src/utils/config.ts`) |
 | CDN folder | `city-builder/` |
 | Public URL | **TBD: Shopsy's CDN host is not documented in any Shopsy repo. Confirm with the platform team before the first CDN promotion.** |
-| Last tag before this doc | `v1.1.4` (2026-06-23, no GitHub Release) |
-| **Next release** | **`v1.1.5`** |
+| Last tag before this doc | `v1.1.5` (2026-09-21) |
+| **Next release** | **`v1.1.6`** |
 
 ## Version numbers
 
@@ -50,13 +50,13 @@ npm run build
 # 3. boot test the production build behind the mock SDK (see below), portrait viewport
 
 # 4. package: validates the contract and writes build-info.json, zip lands in release/
-./scripts/package-release.sh 1.1.5 dist
+./scripts/package-release.sh 1.1.6 dist
 
 # 5. publish
-gh release create v1.1.5 --target "$(git rev-parse HEAD)" \
-  --title "city-builder v1.1.5" \
+gh release create v1.1.6 --target "$(git rev-parse HEAD)" \
+  --title "city-builder v1.1.6" \
   --notes "what changed, in one or two lines" \
-  release/city-builder-v1.1.5-webgl.zip \
+  release/city-builder-v1.1.6-webgl.zip \
   release/build-info.json
 ```
 
