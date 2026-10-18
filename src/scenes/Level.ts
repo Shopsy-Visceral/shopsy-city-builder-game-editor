@@ -16,6 +16,7 @@ import { ShareManager } from "../share/ShareManager";
 import { GAME_ID, GAME_NAME } from "../utils/config";
 import { PlayerPrefs } from "../utils/PlayerPrefs";
 import GameResponseManager from "../shopsystan/shopsyGameResponses";
+import { LevelAnalytics } from "../shopsystan/levelAnalytics";
 
 let _gameplayTutorialShownThisSession = false;
 /* END-USER-IMPORTS */
@@ -1222,6 +1223,10 @@ export default class Level extends Phaser.Scene {
 	// ─── SHOPSY ────────────────────────────────────────────────────────────────
 	private superCoinsWonThisRound = 0;
 	private gameResult: string;
+	// Level instrumentation
+	private loseReason = "unknown";
+	private perfectDrops = 0;
+	private goodDrops = 0;
 
 	// ─── MANAGERS ──────────────────────────────────────────────────────────────
 	private shareManager: ShareManager;
@@ -1545,6 +1550,15 @@ export default class Level extends Phaser.Scene {
 		shopsyBridge.roundStarted();
 		PlayerPrefs.gamesPlayedToday++;
 		PlayerPrefs.gamesPlayedTotal++;
+
+		// Level_Started first, so Game_Started below already carries level_number.
+		this.loseReason = "unknown";
+		this.perfectDrops = 0;
+		this.goodDrops = 0;
+		LevelAnalytics.start(this.playingLevelIndex + 1, this.playingLevelIndex < gameState.currentLevel, {
+			target_score: this.requiredPoints,
+			block_limit: this.maxBlock
+		});
 		ShopsyAnalytics.sendGameStartedEvent();
 
 		this.changeGameState(GAME_STATE.PLAYING);
@@ -1673,6 +1687,7 @@ export default class Level extends Phaser.Scene {
 
 		playSound(this, "completed");
 		this.isGameplayPaused = true;           // stop update loop
+		LevelAnalytics.complete(this.levelOutcomeData());
 		this.onGameOver("win");
 	}
 
@@ -1681,8 +1696,21 @@ export default class Level extends Phaser.Scene {
 
 		playSound(this, "gameover");
 		this.isGameplayPaused = true;           // stop update loop
+		LevelAnalytics.fail(this.loseReason, this.levelOutcomeData());
 		this.share_btn?.setVisible(false);
 		this.onGameOver("lost");
+	}
+
+	/** Game-specific fields attached to Level_Completed / Level_Failed / Level_Abandoned. */
+	private levelOutcomeData(): Record<string, unknown> {
+		return {
+			score: this.currentPoints,
+			target_score: this.requiredPoints,
+			blocks_used: gameState.totalStackedBlocks,
+			block_limit: this.maxBlock,
+			perfect_drops: this.perfectDrops,
+			good_drops: this.goodDrops
+		};
 	}
 
 	private restartGame(): void {
@@ -1693,6 +1721,7 @@ export default class Level extends Phaser.Scene {
 	private abandonGame(): void {
 		this.timePlayedMs = this.time.now - this.gameStartTime;
 		ShopsyAnalytics.sendGameAbandonedEvent(this.currentPoints, this.timePlayedMs);
+		LevelAnalytics.abandon("quit_button", this.levelOutcomeData());
 		if (shopsyBridge.isNative) {
 			shopsyBridge.gameCompleted({
 				gems: 0, // No coins for abandoning, even if they had points at the time
@@ -1762,22 +1791,27 @@ export default class Level extends Phaser.Scene {
 		});
 		this.tapIfPresent(this.exit_from_win_screen_btn, () => {
 			ShopsyAnalytics.sendCtaClickedEvent("claim_rewards_btn");
+			LevelAnalytics.abandon("exit_button", this.levelOutcomeData());
 			shopsyBridge.exitGame();
 		});
 		this.tapIfPresent(this.exit_from_win_screen_btn_1, () => {
 			ShopsyAnalytics.sendCtaClickedEvent("exit_win_btn");
+			LevelAnalytics.abandon("exit_button", this.levelOutcomeData());
 			shopsyBridge.exitGame();
 		});
 		this.tapIfPresent(this.exit_from_lose_screen_btn, () => {
 			ShopsyAnalytics.sendCtaClickedEvent("exit_lose_btn");
+			LevelAnalytics.abandon("exit_button", this.levelOutcomeData());
 			shopsyBridge.exitGame();
 		});
 		this.tapIfPresent(this.gameover_exit_btn, () => {
 			ShopsyAnalytics.sendCtaClickedEvent("exit_btn");
+			LevelAnalytics.abandon("exit_button", this.levelOutcomeData());
 			shopsyBridge.exitGame();
 		});
 		this.tapIfPresent(this.gameover_exit_btn1, () => {
 			ShopsyAnalytics.sendCtaClickedEvent("exit_btn");
+			LevelAnalytics.abandon("exit_button", this.levelOutcomeData());
 			shopsyBridge.exitGame();
 		});
 		// "Next" button — advances level or returns to map if this was a replay
@@ -1803,6 +1837,7 @@ export default class Level extends Phaser.Scene {
 		});
 		this.tapIfPresent(this.lose_btn, () => {
 			this.blockTop.destroy();
+			this.loseReason = "debug";
 			this.changeGameState(GAME_STATE.GAME_OVER_LOSE);
 		});
 
@@ -2051,7 +2086,7 @@ export default class Level extends Phaser.Scene {
 					y: targetDropY,
 					duration: gameplayConfig.dropDurationMiss,
 					ease: "Sine.easeIn",
-					onComplete: () => this.changeGameState(GAME_STATE.GAME_OVER_LOSE)
+					onComplete: () => { this.loseReason = "missed_drop"; this.changeGameState(GAME_STATE.GAME_OVER_LOSE); }
 				});
 				return;
 			}
@@ -2148,8 +2183,8 @@ export default class Level extends Phaser.Scene {
 			if (distance === null || distance > maxToleranceX) return;
 			const calculatedScore = Math.ceil((1 - distance / maxToleranceX) * 50);
 			this.onScoreUpdated(calculatedScore);
-			if (distance <= 3) showQualityTxt("perfect", block);
-			else if (distance <= 10) showQualityTxt("good", block);
+			if (distance <= 3) { this.perfectDrops++; showQualityTxt("perfect", block); }
+			else if (distance <= 10) { this.goodDrops++; showQualityTxt("good", block); }
 		};
 
 		const blockToppling = (): void => {
@@ -2167,7 +2202,7 @@ export default class Level extends Phaser.Scene {
 				y: current.y + 1080 + 200,
 				duration: 1200,
 				ease: "Sine.easeIn",
-				onComplete: () => this.changeGameState(GAME_STATE.GAME_OVER_LOSE)
+				onComplete: () => { this.loseReason = "toppled"; this.changeGameState(GAME_STATE.GAME_OVER_LOSE); }
 			});
 
 			const rotateLeft = current.x < previousX;
@@ -2205,6 +2240,7 @@ export default class Level extends Phaser.Scene {
 				if (!isReplay) setCurrentLevel(gameState.currentLevel + 1);
 				this.changeGameState(GAME_STATE.GAME_OVER_WIN);
 			} else {
+				this.loseReason = "score_short";
 				this.changeGameState(GAME_STATE.GAME_OVER_LOSE);
 			}
 		};
@@ -2237,6 +2273,7 @@ export default class Level extends Phaser.Scene {
 
 	private goToLevelSelect(): void {
 		console.log("Navigating to Level Select");
+		LevelAnalytics.clearContext();
 		this.scene.start("Preload");
 	}
 

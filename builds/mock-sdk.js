@@ -78,6 +78,16 @@
           totalCoinBalance: 1250 + seq * 15
         }));
         break;
+      case "getPlayerPref": {
+        var k = msg.data && msg.data.key;
+        var stored = null;
+        try { stored = JSON.parse(localStorage.getItem("__mock_pref_" + k)); } catch (e) { stored = null; }
+        deliver(envelope("playerPrefs", "playerPrefValue", { key: k, value: stored != null ? stored : (msg.data ? msg.data.defaultValue : null) }));
+        break;
+      }
+      case "setPlayerPref":
+        try { localStorage.setItem("__mock_pref_" + msg.data.key, JSON.stringify(msg.data.value)); } catch (e) {}
+        break;
       case "analyticsEvent":
         // Case-sensitive per contract - record verbatim for eyeballing.
         log("ANALYTICS", (msg.data && (msg.data.eventName || msg.data.name)) || "(unnamed)", msg.data);

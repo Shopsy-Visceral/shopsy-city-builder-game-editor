@@ -60,6 +60,7 @@ export class PlayerPrefs {
       this.requestValue('games_played_total', 0),
       this.requestValue('has_seen_tutorial', false),
       this.requestValue('has_seen_gameplay_tutorial', false),
+      this.requestValue('level_stats_v1', null),
     ];
 
     this.hydrationPromise = Promise.all(requests)
@@ -163,6 +164,15 @@ export class PlayerPrefs {
     entries.forEach(([key, value]) => {
       shopsyBridge.setPlayerPref(key, value);
     });
+  }
+
+  /** Generic accessors for keys owned by other modules (e.g. level analytics). */
+  static getValue<T>(key: string, fallback: T): T {
+    return this.read(key, fallback);
+  }
+
+  static setValue(key: string, value: any): void {
+    this.write(key, value);
   }
 
   static get lastLoginDate(): string {
