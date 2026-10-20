@@ -259,6 +259,8 @@ export interface ShopsyBridge {
 
     // Analytics
     analyticsEvent(eventName: string, eventData?: Record<string, unknown>): void;
+    /** Registers a hook that adds shared props (e.g. level_number) to every analytics event. */
+    setAnalyticsContextProvider(provider: ((metadata: Record<string, unknown>) => void) | null): void;
 
     // Share
     shareContent(text: string, payload: ShareContentPayload): void;
@@ -277,6 +279,7 @@ export interface ShopsyBridge {
  */
 class ShopsyBridgeImpl implements ShopsyBridge {
     private _env: ShopsyEnvironment = "standalone";
+    private analyticsContextProvider: ((metadata: Record<string, unknown>) => void) | null = null;
     private _initialized = false;
     private readyPromise: Promise<void>;
     private resolveReady?: () => void;
@@ -814,14 +817,20 @@ class ShopsyBridgeImpl implements ShopsyBridge {
      * @param eventName - Name of the analytics event (e.g., 'game_start', 'building_tapped')
      * @param eventData - Optional event-specific data payload
      */
+    public setAnalyticsContextProvider(provider: ((metadata: Record<string, unknown>) => void) | null): void {
+        this.analyticsContextProvider = provider;
+    }
+
     public analyticsEvent(eventName: string, eventData?: Record<string, unknown>): void {
+        const metadata: Record<string, unknown> = { ...(eventData || {}) };
+        try { this.analyticsContextProvider?.(metadata); } catch (err) { this.logFn("[ShopsyBridge] analytics context failed", err); }
         this.send(
             ShopsyMessageType.ANALYTICS_EVENT,
             ShopsyMessageAction.ANALYTICS_EVENT,
             {
                 eventName,
                 timestamp: Math.floor(new Date().getTime() / 1000),
-                metadata: eventData || {}  // ← Nest instead of spread
+                metadata  // ← Nest instead of spread
             }
         );
     }
